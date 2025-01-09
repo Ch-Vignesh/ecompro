@@ -1,0 +1,42 @@
+# Python files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+
+# Virtual environments
+venv/
+env/
+myenv/
+
+# Django
+*.env
+settings_local.py
+db.sqlite3
+db.sqlite3-journal
+
+# Logs
+*.log
+
+# Media and Static files
+media/
+static/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+build/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+.cache
+*.cover
