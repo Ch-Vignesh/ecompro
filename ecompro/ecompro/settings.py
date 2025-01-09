@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+import os
 
 from pathlib import Path
 
@@ -27,6 +28,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+STRIPE_PUB_KEY = 'pk_test_51QerUc03xbmEmnvx6XRu8yeqticrYnwPjUBQOOzpHtDD838ZR6mxyMKjUMeAkrXCl18ViJ4qAdCN1RVClZfYeKCc00JbRQT2Br'
+STRIPE_SECRET_KEY = 'sk_test_51QerUc03xbmEmnvxOVoJUchqasPakvZdllRyizbhS6y98oGb8b1nsdhTIsgJYqCmGb68WpdIFdZbuEEkS4Pavxwm00m2hocRzr'
+
+SESSION_COOKIE_AGE = 86400
+
+CART_SESSION_ID = 'cart'
 
 # Application definition
 
@@ -37,6 +44,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'core',
+    'cart',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'product',
+
 ]
 
 MIDDLEWARE = [
@@ -54,7 +67,7 @@ ROOT_URLCONF = 'ecompro.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],  # Ensure this points to your templates directory
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -80,6 +93,7 @@ DATABASES = {
     }
 }
 
+CART_SESSION_ID = 'cart'
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -121,3 +135,13 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Allow any user without authentication
+    ],
+}

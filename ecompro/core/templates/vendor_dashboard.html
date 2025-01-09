@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Vendor Dashboard{% endblock %}
+
+{% block content %}
+<h1>Vendor Dashboard</h1>
+<a href="{% url 'product-add' %}" class="btn btn-primary mb-3">Add New Product</a>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Inventory</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for product in products %}
+            <tr>
+                <td>{{ product.name }}</td>
+                <td>${{ product.price }}</td>
+                <td>{{ product.inventory }}</td>
+                <td>
+                    <a href="{% url 'product-edit' product.id %}" class="btn btn-warning btn-sm">Edit</a>
+                    <a href="{% url 'product-delete' product.id %}" class="btn btn-danger btn-sm">Delete</a>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

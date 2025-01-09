@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Review{% endblock %}
+
+{% block content %}
+<h1>Add Review for {{ product.name }}</h1>
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="rating" class="form-label">Rating (1-5)</label>
+        <input type="number" name="rating" id="rating" class="form-control" min="1" max="5" required>
+    </div>
+    <div class="mb-3">
+        <label for="comment" class="form-label">Comment</label>
+        <textarea name="comment" id="comment" class="form-control" rows="4" required></textarea>
+    </div>
+    <button class="btn btn-primary">Submit</button>
+</form>
+{% endblock %}

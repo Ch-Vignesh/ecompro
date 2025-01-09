@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ product.name }}{% endblock %}
+
+{% block content %}
+<h1>{{ product.name }}</h1>
+<img src="{{ product.image.url }}" class="img-fluid mb-3" alt="{{ product.name }}">
+<p>{{ product.description }}</p>
+<p><strong>Price: ${{ product.price }}</strong></p>
+<p>In Stock: {{ product.inventory }}</p>
+
+<form method="post" action="{% url 'cart-add' product.id %}">
+    {% csrf_token %}
+    <button class="btn btn-success">Add to Cart</button>
+</form>
+
+<h2>Reviews</h2>
+<ul>
+    {% for review in product.reviews.all %}
+        <li><strong>{{ review.customer.username }}:</strong> {{ review.comment }} (Rating: {{ review.rating }}/5)</li>
+    {% endfor %}
+</ul>
+
+<a href="{% url 'add-review' product.id %}" class="btn btn-info">Add Review</a>
+{% endblock %}
