@@ -78,7 +78,7 @@ class Reply(models.Model):
 class Variant(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants")
     attributes = models.ManyToManyField(Value, related_name="variants")  # Links values to this variant
-    sku = models.CharField(max_length=100, unique=True)  # Optional SKU for the variant
+    sku = models.CharField(max_length=100, unique=True, null=True, blank=True)  # Optional SKU for the variant
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stock = models.PositiveIntegerField(default=0)  # Stock quantity
     status = models.CharField(max_length=20, choices=[('in_stock', 'In Stock'), ('out_of_stock', 'Out of Stock')], default='in_stock')
