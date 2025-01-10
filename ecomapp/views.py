@@ -146,7 +146,7 @@ class ProductDetailsView(APIView):
         try:
             product = Product.objects.get(pk=pk)
         except Product.DoesNotExist:
-            return Response({"error": "Product  not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Product   not found."}, status=status.HTTP_404_NOT_FOUND)
 
         attribute_name = request.data.get("attribute")
         value_name = request.data.get("value")
@@ -308,6 +308,64 @@ class VariantView(APIView):
 
         product_serializer = ProductSerializer(product)
         return Response(product_serializer.data, status=status.HTTP_200_OK)
+
+    
+    def put(self, request, product_id):
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist:
+            return Response({"error": "Product  not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        variant_id = request.data.get("variant_id", None)
+        if not variant_id:
+            return Response({"error": "Variant ID is required for updates."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            variant = Variant.objects.get(pk=variant_id, product=product)
+        except Variant.DoesNotExist:
+            return Response({"error": "Variant not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update attributes
+        attribute_values = request.data.get("attributes", [])
+        if attribute_values:
+            attributes_to_save = []
+            for attribute_value in attribute_values:
+                attribute_name = attribute_value.get("attribute")
+                value_name = attribute_value.get("value")
+
+                if not attribute_name or not value_name:
+                    return Response({"error": "Each attribute must have a name and value."}, status=status.HTTP_400_BAD_REQUEST)
+
+                attribute, _ = Attribute.objects.get_or_create(name=attribute_name)
+                value, _ = Value.objects.get_or_create(attribute=attribute, value=value_name)
+                attributes_to_save.append(value)
+
+            variant.attributes.set(attributes_to_save)
+
+        # Update SKU and price if provided
+        sku = request.data.get("sku", None)
+        price = request.data.get("price", None)
+        stock = request.data.get("stock", None)
+
+
+        if sku:
+            if Variant.objects.filter(sku=sku).exclude(pk=variant_id).exists():
+                return Response({"error": "SKU already exists. Please provide a unique SKU."}, status=status.HTTP_400_BAD_REQUEST)
+            variant.sku = sku
+
+        if price:
+            variant.price = price
+            
+        
+        if stock:  
+            variant.stock = stock
+            
+
+
+        variant.save()
+
+        serializer = VariantSerializer(variant)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ReviewView(APIView):
