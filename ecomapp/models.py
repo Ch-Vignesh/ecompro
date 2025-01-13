@@ -4,17 +4,18 @@ from django.contrib.auth.models import User
 
 
 class Category(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
 
     def __str__(self):
         return self.name
     
 # Product model
 class Product(models.Model):
+    seller = models.CharField(max_length=100, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField()
-    seller = models.CharField(max_length=100, blank=True)
-    brand = models.CharField(max_length=255, blank=True)
+    
+    brand = models.CharField(max_length=100, blank=True)
     category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE, null=True)
     image = models.ImageField(upload_to='product_images/', null=True, blank=True) 
     
@@ -78,11 +79,16 @@ class Reply(models.Model):
 class Variant(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants")
     attributes = models.ManyToManyField(Value, related_name="variants")  # Links values to this variant
-    sku = models.CharField(max_length=100, unique=True,blank=True, null=True)  # Optional SKU for the variant
+    sku = models.CharField(max_length=100, unique=True)  # Optional SKU for the variant
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stock = models.PositiveIntegerField(default=0)  # Stock quantity
     status = models.CharField(max_length=20, choices=[('in_stock', 'In Stock'), ('out_of_stock', 'Out of Stock')], default='in_stock')
 
+    def save(self, *args, **kwargs):
+        # Automatically update the status based on stock
+        self.status = 'in_stock' if self.stock > 0 else 'out_of_stock'
+        super().save(*args, **kwargs)
+        
     def is_in_stock(self):
         return self.stock > 0
     
@@ -93,6 +99,13 @@ class VariantImage(models.Model):
     variant = models.ForeignKey(Variant, related_name='images', on_delete=models.CASCADE)
     image = models.ImageField(upload_to='variants/%Y/%m/%d/')
     is_main_image = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Set product's image to the first variant image if not already set
+        if not self.variant.product.image:
+            self.variant.product.image = self.image
+            self.variant.product.save()
 
     def __str__(self):
         return f"Image for {self.variant.sku}"

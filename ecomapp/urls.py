@@ -1,5 +1,5 @@
 # catalog/urls.py
-from django.urls import path, include
+from django.urls import path
 from .views import (
     ProductView,
     AttributeView,
@@ -31,5 +31,4 @@ urlpatterns = [
     path('variants/<int:variant_id>/images/', VariantImageUploadView.as_view(), name='variant-image-upload'),
     path('categories/<int:category_id>/price-range/', VariantPriceRangeView.as_view(), name='variant-price-range'),
     path('categories/', CategoryCreateView.as_view(), name='category-list-create'),
-    
     ]
