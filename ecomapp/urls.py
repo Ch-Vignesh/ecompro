@@ -1,4 +1,5 @@
 # catalog/urls.py
+
 from django.urls import path
 from .views import (
     ProductView,
@@ -30,5 +31,6 @@ urlpatterns = [
     path('reviews/<int:review_id>/replies/', ReplyView.as_view(), name='review-replies'),
     path('variants/<int:variant_id>/images/', VariantImageUploadView.as_view(), name='variant-image-upload'),
     path('categories/<int:category_id>/price-range/', VariantPriceRangeView.as_view(), name='variant-price-range'),
-    path('categories/', CategoryCreateView.as_view(), name='category-list-create'),
+    path('categories/', CategoryCreateView.as_view(), name='category-list-create')
+    
     ]

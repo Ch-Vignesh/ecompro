@@ -8,7 +8,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from .models import Product, Attribute, Value, ProductAttribute, Variant, VariantImage, Review, Reply, Category
 from .serializers import (
-    ProductSerializer,
+
     AttributeSerializer,
     ValueSerializer,
     ProductAttributeSerializer,
@@ -16,8 +16,8 @@ from .serializers import (
     VariantSerializer,
     ReviewSerializer,
     ReplySerializer,
-    CategorySerializer
-    
+    CategorySerializer,
+    VariantImageSerializer
 )
 from rest_framework.pagination import PageNumberPagination
 import uuid
@@ -43,7 +43,7 @@ class CategoryCreateView(APIView):
             
             # Get all products for this specific category
             products = Product.objects.filter(category=category)
-            serializer = ProductSerializer(products, many=True)
+            serializer = ProductDetailSerializer(products, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             # Fetch all categories if category_id is not provided
@@ -76,9 +76,9 @@ class ProductView(APIView):
 
 
     def post(self, request):
-        serializer = ProductSerializer(data=request.data)
+        serializer = ProductDetailSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            product = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -195,59 +195,69 @@ class ValuesByAttributeView(APIView):
         serializer = ValueSerializer(values, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
-    
 class SearchView(APIView):
-
     def get(self, request):
         query = request.query_params.get("q", "").strip()
         brand = request.query_params.get("brand", "").strip()
         
         if not query and not brand:
             return Response(
-                {"error": "Please provide a search query using the 'q' parameter."},
+                {"error": "Please provide a search query using the '?q=' for parameter & '?brand' for brand"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
+        # Start with all products
         products = Product.objects.all()
-        # Search in products
+
+        # Filter products by query
         if query:
-            products = Product.objects.filter(
+            products = products.filter(
                 Q(name__icontains=query) | Q(description__icontains=query)
             )
-            
+
+        # Filter products by brand
         if brand:
             products = products.filter(brand__icontains=brand)
+
+        # Serialize and return the filtered products
         product_serializer = ProductDetailSerializer(products, many=True)
-
-        # Search in attributes
-        attributes = Attribute.objects.filter(name__icontains=query)
-        attribute_serializer = AttributeSerializer(attributes, many=True)
-
-        # Search in values
-        values = Value.objects.filter(value__icontains=query)
-        value_serializer = ValueSerializer(values, many=True)
-
+        
+        variants = Variant.objects.filter(product__in=products).select_related("product")
+        variant_serializer = VariantSerializer(variants, many=True)
+        
         return Response(
-            {
+            {   
                 "products": product_serializer.data,
-                "attributes": attribute_serializer.data,
-                "values": value_serializer.data,
+                "variants": variant_serializer.data,
             },
             status=status.HTTP_200_OK,
         )
+
         
         
 class VariantImageUploadView(APIView):
-    parser_classes = (MultiPartParser, FormParser)
 
-    def post(self, request, variant_id, *args, **kwargs):
-        variant = Variant.objects.get(id=variant_id)
-        images = request.FILES.getlist('images')
-        for image in images:
-            VariantImage.objects.create(variant=variant, image=image)
-        return Response({"message": "Images uploaded successfully"}, status=HTTP_201_CREATED)
-    
-    
+    def post(self, request, variant_id):
+        try:
+            variant = Variant.objects.get(id=variant_id)
+        except Variant.DoesNotExist:
+            return Response({"error": "Variant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        uploaded_images = request.FILES.getlist('images')
+        is_main_image_flag = request.data.get('is_main_image', 'false').lower() == 'true'
+
+        for index, image in enumerate(uploaded_images):
+            is_main_image = is_main_image_flag if index == 0 else False
+            variant_image = VariantImage.objects.create(
+                variant=variant, image=image, is_main_image=is_main_image
+            )
+
+            # Update the product's image if this is the first image
+            if index == 0 and not variant.product.image:
+                variant.product.image = variant_image.image
+                variant.product.save()
+
+        return Response({"message": "Images uploaded successfully."}, status=status.HTTP_201_CREATED)
 class VariantView(APIView):
     def post(self, request, product_id):
         try:
@@ -258,6 +268,8 @@ class VariantView(APIView):
         attribute_values = request.data.get("attributes", [])
         sku = request.data.get("sku", None)
         price = request.data.get("price", None)
+        stock = request.data.get("stock",0) 
+        
 
         # Auto-generate SKU if not provided
         if not sku:
@@ -290,7 +302,7 @@ class VariantView(APIView):
             attributes_to_save.append(value)
 
         # Create the variant
-        variant = Variant.objects.create(product=product, sku=sku, price=price)
+        variant = Variant.objects.create(product=product, sku=sku, price=price, stock=stock)
         variant.attributes.set(attributes_to_save)  # Assign the values to the variant
         variant.save()
 
@@ -306,7 +318,7 @@ class VariantView(APIView):
         except Product.DoesNotExist:
             return Response({"error": "Product not  found."}, status=status.HTTP_404_NOT_FOUND)
 
-        product_serializer = ProductSerializer(product)
+        product_serializer = ProductDetailSerializer(product)
         return Response(product_serializer.data, status=status.HTTP_200_OK)
 
     
@@ -357,7 +369,7 @@ class VariantView(APIView):
             variant.price = price
             
         
-        if stock:  
+        if stock is not None:  
             variant.stock = stock
             
 
