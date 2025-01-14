@@ -40,23 +40,24 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'accounts',
     'ecomapp',
+    'rest_framework.authtoken',
+    # 'django.contrib.sites', 
+    'rest_framework_simplejwt',
     'cart',
     'orders',
     'payments',
-]
-
-
-RAZORPAY_KEY_ID = "rzp_test_FHNGzZ078KP6ZO"
-RAZORPAY_KEY_SECRET = "N3Yqk9JZlk5ReQGjYy8qOEi6"
-
-
+    ]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
 }
+
+RAZORPAY_KEY_ID = "rzp_test_FHNGzZ078KP6ZO"
+RAZORPAY_KEY_SECRET = "N3Yqk9JZlk5ReQGjYy8qOEi6"
 
 STRIPE_PUB_KEY = 'pk_test_51QerUc03xbmEmnvx6XRu8yeqticrYnwPjUBQOOzpHtDD838ZR6mxyMKjUMeAkrXCl18ViJ4qAdCN1RVClZfYeKCc00JbRQT2Br'
 STRIPE_SECRET_KEY = 'sk_test_51QerUc03xbmEmnvxOVoJUchqasPakvZdllRyizbhS6y98oGb8b1nsdhTIsgJYqCmGb68WpdIFdZbuEEkS4Pavxwm00m2hocRzr'
@@ -132,6 +133,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -154,3 +159,5 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# SITE_ID = 2
