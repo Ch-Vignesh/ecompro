@@ -258,6 +258,8 @@ class VariantImageUploadView(APIView):
                 variant.product.save()
 
         return Response({"message": "Images uploaded successfully."}, status=status.HTTP_201_CREATED)
+
+        
 class VariantView(APIView):
     def post(self, request, product_id):
         try:
