@@ -27,6 +27,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+SESSION_COOKIE_AGE = 86400
+CART_SESSION_ID = 'cart'
 
 # Application definition
 
@@ -38,14 +40,36 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'ecomapp'
+    'ecomapp',
+    'cart',
+    'orders',
+    'payments',
 ]
+
+
+RAZORPAY_KEY_ID = "rzp_test_FHNGzZ078KP6ZO"
+RAZORPAY_KEY_SECRET = "N3Yqk9JZlk5ReQGjYy8qOEi6"
+
+
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
 }
+
+STRIPE_PUB_KEY = 'pk_test_51QerUc03xbmEmnvx6XRu8yeqticrYnwPjUBQOOzpHtDD838ZR6mxyMKjUMeAkrXCl18ViJ4qAdCN1RVClZfYeKCc00JbRQT2Br'
+STRIPE_SECRET_KEY = 'sk_test_51QerUc03xbmEmnvxOVoJUchqasPakvZdllRyizbhS6y98oGb8b1nsdhTIsgJYqCmGb68WpdIFdZbuEEkS4Pavxwm00m2hocRzr'
+
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'vigneshchinthakuntla4666@gmail.com'  # Replace with your email
+EMAIL_HOST_PASSWORD = 'ssii ruwt lflh ghef'  # Replace with your email's password
+# DEFAULT_FROM_EMAIL = 'vigneshchinthakuntla4666@gmail.com'
 
 
 MIDDLEWARE = [
