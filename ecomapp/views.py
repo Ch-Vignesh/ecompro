@@ -1,5 +1,5 @@
 # catalog/views.py
-
+from accounts.models import *
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -21,12 +21,16 @@ from .serializers import (
 )
 from rest_framework.pagination import PageNumberPagination
 import uuid
+from rest_framework.permissions import IsAuthenticated
+from .permissions import IsVendor
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10 # Default page size, you can change it to any value
     page_size_query_param = 'page_size'  # Allow clients to specify the page size
     page_query_param = 'page'  # Allow clients to specify the page number
     max_page_size = 100  # Maximum page size allowed
+
 
 
 class CategoryCreateView(APIView):
@@ -58,28 +62,68 @@ class CategoryCreateView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
+
 
 # View to handle Product creation and listing
 class ProductView(APIView):
     pagination_class = StandardResultsSetPagination
-    
+    authentication_classes = [JWTAuthentication]
+
+    def get_permissions(self):
+        """
+        Dynamically assign permissions based on the request method.
+        - Allow unauthenticated access for 'GET'.
+        - Require authentication for 'POST'.
+        """
+        if self.request.method == "GET":
+            return []  # No authentication required for GET
+        return [IsAuthenticated()]
+
     def get(self, request):
-        products = Product.objects.all()
-        
-         # Apply pagination
+        # Check if the user is authenticated
+        user = request.user if request.user.is_authenticated else None
+
+        if user:
+            try:
+                # Check if the user is a vendor
+                vendor = Vendors.objects.get(email=user.email)
+                # Filter products by the vendor
+                products = Product.objects.filter(seller=vendor.email)
+            except Vendors.DoesNotExist:
+                # If the user is authenticated but not a vendor, return all products
+                products = Product.objects.all()
+        else:
+            # If the user is not authenticated, return all products
+            products = Product.objects.all()
+
+        # Apply pagination
         paginator = StandardResultsSetPagination()
         result_page = paginator.paginate_queryset(products, request)
-        
+
+        # Serialize the products
         serializer = ProductDetailSerializer(result_page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
-
     def post(self, request):
+        # Ensure that only a vendor can add products
+        user = request.user
+
+        # Check if the user is a vendor by looking for the related 'Vendors' instance
+        try:
+            vendor = Vendors.objects.get(email=user.email)
+        except Vendors.DoesNotExist:
+            return Response({"detail": "You must be a vendor to add products."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Serialize the product data from the request
         serializer = ProductDetailSerializer(data=request.data)
+
         if serializer.is_valid():
-            product = serializer.save()
+            # Save the product and associate the vendor as the seller
+            product = serializer.save(seller=vendor.email)  # Save the vendor's email as the seller
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -115,6 +159,7 @@ class ValueView(APIView):
 
 # View to handle ProductAttribute creation
 class ProductAttributeView(APIView):
+
     def get(self, request):
         product_attributes = ProductAttribute.objects.all()
         serializer = ProductAttributeSerializer(product_attributes, many=True)
@@ -195,19 +240,28 @@ class ValuesByAttributeView(APIView):
         serializer = ValueSerializer(values, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+
+
+
 class SearchView(APIView):
+
     def get(self, request):
         query = request.query_params.get("q", "").strip()
         brand = request.query_params.get("brand", "").strip()
-        
+
         if not query and not brand:
             return Response(
                 {"error": "Please provide a search query using the '?q=' for parameter & '?brand' for brand"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        # Start with all products
-        products = Product.objects.all()
+
+        # Start with all products, but filter if the user is a vendor
+        if hasattr(request, 'user') and isinstance(request.user, Vendors):
+            # If the user is a vendor, only allow them to search their own products
+            products = Product.objects.filter(vendor=request.user)
+        else:
+            # If the user is a customer or not authenticated, allow them to search all products
+            products = Product.objects.all()
 
         # Filter products by query
         if query:
@@ -230,18 +284,32 @@ class SearchView(APIView):
                 "products": product_serializer.data,
                 "variants": variant_serializer.data,
             },
-            status=status.HTTP_200_OK,
+            status=status.HTTP_200_OK
         )
 
-        
-        
-class VariantImageUploadView(APIView):
 
+
+
+class VariantImageUploadView(APIView):
+    
     def post(self, request, variant_id):
         try:
             variant = Variant.objects.get(id=variant_id)
         except Variant.DoesNotExist:
             return Response({"error": "Variant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get the current authenticated user
+        user = request.user
+
+        try:
+            # Check if the user is a vendor
+            vendor = Vendors.objects.get(email=user.email)
+        except Vendors.DoesNotExist:
+            return Response({"error": "You must be a vendor to upload images."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure the vendor is the one associated with the product (seller field)
+        if variant.product.seller != vendor.email:
+            return Response({"error": "You are not authorized to upload images for this variant."}, status=status.HTTP_403_FORBIDDEN)
 
         uploaded_images = request.FILES.getlist('images')
         is_main_image_flag = request.data.get('is_main_image', 'false').lower() == 'true'
@@ -259,19 +327,32 @@ class VariantImageUploadView(APIView):
 
         return Response({"message": "Images uploaded successfully."}, status=status.HTTP_201_CREATED)
 
-        
 class VariantView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, product_id):
+        # Ensure the logged-in user is a vendor
+        user = request.user
+        try:
+            vendor = Vendors.objects.get(email=user.email)
+        except Vendors.DoesNotExist:
+            return Response({"error": "You must be a vendor to add variants."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             product = Product.objects.get(pk=product_id)
         except Product.DoesNotExist:
-            return Response({"error": "Product  not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Ensure that the product belongs to the logged-in vendor
+        if product.seller != vendor.email:
+            return Response({"error": "You can only add variants to your own products."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Process the variant attributes, SKU, price, and stock
         attribute_values = request.data.get("attributes", [])
         sku = request.data.get("sku", None)
         price = request.data.get("price", None)
-        stock = request.data.get("stock",0) 
-        
+        stock = request.data.get("stock", 0)
 
         # Auto-generate SKU if not provided
         if not sku:
@@ -303,7 +384,7 @@ class VariantView(APIView):
             # Append the value to the list of attributes to be associated with the variant
             attributes_to_save.append(value)
 
-        # Create the variant
+        # Create the variant and associate it with the product and vendor
         variant = Variant.objects.create(product=product, sku=sku, price=price, stock=stock)
         variant.attributes.set(attributes_to_save)  # Assign the values to the variant
         variant.save()
@@ -311,24 +392,47 @@ class VariantView(APIView):
         # Serialize and return the created variant
         serializer = VariantSerializer(variant)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-     
-
 
     def get(self, request, product_id):
+        # Ensure the logged-in user is a vendor
+        user = request.user
+        try:
+            vendor = Vendors.objects.get(email=user.email)
+        except Vendors.DoesNotExist:
+            return Response({"error": "You must be a vendor to view variants."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             product = Product.objects.get(pk=product_id)
         except Product.DoesNotExist:
-            return Response({"error": "Product not  found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        product_serializer = ProductDetailSerializer(product)
-        return Response(product_serializer.data, status=status.HTTP_200_OK)
+        # Ensure that the product belongs to the logged-in vendor
+        if product.seller != vendor.email:
+            return Response({"error": "You can only view variants for your own products."}, status=status.HTTP_403_FORBIDDEN)
 
-    
+        # Get variants for the product
+        variants = Variant.objects.filter(product=product)
+
+        # Serialize and return the variants
+        serializer = VariantSerializer(variants, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def put(self, request, product_id):
+        # Ensure the logged-in user is a vendor
+        user = request.user
+        try:
+            vendor = Vendors.objects.get(email=user.email)
+        except Vendors.DoesNotExist:
+            return Response({"error": "You must be a vendor to update variants."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             product = Product.objects.get(pk=product_id)
         except Product.DoesNotExist:
-            return Response({"error": "Product  not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Ensure that the product belongs to the logged-in vendor
+        if product.seller != vendor.email:
+            return Response({"error": "You can only update variants for your own products."}, status=status.HTTP_403_FORBIDDEN)
 
         variant_id = request.data.get("variant_id", None)
         if not variant_id:
@@ -339,7 +443,7 @@ class VariantView(APIView):
         except Variant.DoesNotExist:
             return Response({"error": "Variant not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Update attributes
+        # Update attributes if provided
         attribute_values = request.data.get("attributes", [])
         if attribute_values:
             attributes_to_save = []
@@ -356,11 +460,10 @@ class VariantView(APIView):
 
             variant.attributes.set(attributes_to_save)
 
-        # Update SKU and price if provided
+        # Update SKU, price, and stock if provided
         sku = request.data.get("sku", None)
         price = request.data.get("price", None)
         stock = request.data.get("stock", None)
-
 
         if sku:
             if Variant.objects.filter(sku=sku).exclude(pk=variant_id).exists():
@@ -369,12 +472,9 @@ class VariantView(APIView):
 
         if price:
             variant.price = price
-            
-        
-        if stock is not None:  
-            variant.stock = stock
-            
 
+        if stock is not None:
+            variant.stock = stock
 
         variant.save()
 
@@ -382,18 +482,40 @@ class VariantView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+
+
 class ReviewView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, product_id):
         try:
             product = Product.objects.get(pk=product_id)
         except Product.DoesNotExist:
             return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Ensure the user is a vendor and owns the product
+        user = request.user
+        try:
+            vendor = Vendors.objects.get(email=user.email)
+            if product.seller != vendor.email:
+                return Response({"error": "You can only view reviews for your own products."}, status=status.HTTP_403_FORBIDDEN)
+        except Vendors.DoesNotExist:
+            return Response({"error": "You must be a vendor to view reviews for this product."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get reviews for the product
         reviews = Review.objects.filter(product=product)
         serializer = ReviewSerializer(reviews, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, product_id):
+        # Ensure the user is a customer
+        user = request.user
+        try:
+            Customers.objects.get(email=user.email)
+        except Customers.DoesNotExist:
+            return Response({"error": "Only customers can add reviews."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             product = Product.objects.get(pk=product_id)
         except Product.DoesNotExist:
@@ -405,6 +527,8 @@ class ReviewView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+
 class ReplyView(APIView):
     def get(self, request, review_id):
         try:
@@ -412,20 +536,40 @@ class ReplyView(APIView):
         except Review.DoesNotExist:
             return Response({"error": "Review not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        replies = Reply.objects.filter(review=review)
-        serializer = ReplySerializer(replies, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # If the user is a vendor, ensure they are allowed to see replies for their product only
+        if isinstance(request.user, Vendors):
+            # Vendor can only see replies for their own products
+            if review.product.seller != request.user.email:
+                return Response({"error": "You can only view replies for your own products."}, status=status.HTTP_403_FORBIDDEN)
+            else :
+                print("your products")
+
+        else:
+        # Customers can see all replies
+            replies = Reply.objects.filter(review=review)
+            serializer = ReplySerializer(replies, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, review_id):
+        # Ensure the user is a vendor (only vendors can post replies)
+        if not isinstance(request.user, Vendors):
+            return Response({"error": "Only vendors can post replies."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             review = Review.objects.get(pk=review_id)
         except Review.DoesNotExist:
             return Response({"error": "Review not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Ensure that the review belongs to the product the vendor is selling
+        if review.product.seller != request.user.email:
+            return Response({"error": "You can only reply to reviews on products you are selling."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Serialize and save the reply
         serializer = ReplySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(review=review, user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

@@ -14,3 +14,18 @@ urlpatterns = [
     path("vendors/<int:pk>/update/", VendorUpdateView.as_view(), name="vendor_update"),
 
 ]
+from django.urls import path
+from .views import (
+    AdminCustomerListView,
+    AdminVendorListView,
+    AdminCustomerDetailView,
+    AdminVendorDetailView,
+)
+
+urlpatterns += [
+    # Admin routes
+    path("admin/customers/", AdminCustomerListView.as_view(), name="admin_customer_list"),
+    path("admin/vendors/", AdminVendorListView.as_view(), name="admin_vendor_list"),
+    path("admin/customers/<int:pk>/", AdminCustomerDetailView.as_view(), name="admin_customer_detail"),
+    path("admin/vendors/<int:pk>/", AdminVendorDetailView.as_view(), name="admin_vendor_detail"),
+]

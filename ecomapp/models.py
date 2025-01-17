@@ -1,6 +1,10 @@
 # Create your models here.
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
+
+
 
 
 class Category(models.Model):
@@ -9,12 +13,12 @@ class Category(models.Model):
     def __str__(self):
         return self.name
     
+
 # Product model
 class Product(models.Model):
     seller = models.CharField(max_length=100, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField()
-    
     brand = models.CharField(max_length=100, blank=True)
     category = models.ForeignKey(Category, related_name='products', on_delete=models.CASCADE, null=True)
     image = models.ImageField(upload_to='product_images/', null=True, blank=True) 
@@ -40,6 +44,11 @@ class Value(models.Model):
     def __str__(self):
         return self.value
 
+
+
+
+
+
 # ProductAttribute model to associate products with attributes and values
 class ProductAttribute(models.Model):
     product = models.ForeignKey(Product, related_name='attributes', on_delete=models.CASCADE)
@@ -50,30 +59,74 @@ class ProductAttribute(models.Model):
         return f'{self.product.name} - {self.attribute.name} - {self.value.value}'
 
 
+# class Review(models.Model):
+#     product = models.ForeignKey(Product, related_name="reviews", on_delete=models.CASCADE)
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     rating = models.PositiveIntegerField()  # Rating from 1 to 5
+#     content = models.TextField()
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"Review by {self.user.username} on {self.product.name} - {self.rating} Stars"
+
+
+
+# class Reply(models.Model):
+#     review = models.ForeignKey(Review, related_name="replies", on_delete=models.CASCADE)
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     reply = models.TextField()
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"Reply by {self.user.username}"
+    
+    
+
 class Review(models.Model):
-    product = models.ForeignKey(Product, related_name="reviews", on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    rating = models.PositiveIntegerField()  # Rating from 1 to 5
-    content = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    product = models.ForeignKey(
+        'Product',  # Reference to the Product model
+        related_name='reviews',
+        on_delete=models.CASCADE
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Reference to the custom user model
+        on_delete=models.CASCADE
+    )
+    rating = models.PositiveIntegerField(
+        validators=[
+            MinValueValidator(1, message="Rating must be at least 1."),
+            MaxValueValidator(5, message="Rating cannot be greater than 5.")
+        ]  # Ensures rating is between 1 and 5
+    )
+    content = models.TextField(null=True, blank=True)  # Optional review text
+    created_at = models.DateTimeField(auto_now_add=True)  # Automatically set the creation date
+    updated_at = models.DateTimeField(auto_now=True)  # Automatically update when modified
+
+    class Meta:
+        unique_together = ('product', 'user')  # Ensures a user can only review a product once
+        ordering = ['-created_at']  # Sort reviews by newest first
 
     def __str__(self):
-        return f"Review by {self.user.username} on {self.product.name} - {self.rating} Stars"
-
-
-
+        return f"Review by {self.user.email} on {self.product.name} - {self.rating} Stars"
+    
 
 
 class Reply(models.Model):
     review = models.ForeignKey(Review, related_name="replies", on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,  # Reference to the custom user model
+        on_delete=models.CASCADE
+    )
     reply = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ('review', 'user')  # Ensures a user can only reply once to a review
+        ordering = ['-created_at']  # Sort replies by newest first
+
     def __str__(self):
-        return f"Reply by {self.user.username}"
-    
-    
+        return f"Reply by {self.user.email} on review by {self.review.user.email}"
+
 
 #variants for each products
 class Variant(models.Model):

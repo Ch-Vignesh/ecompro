@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.utils import timezone
+from django.contrib.auth.models import User
+from django.contrib.auth.hashers import make_password
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -12,7 +14,10 @@ class CustomUserManager(BaseUserManager):
         extra_fields.pop('username', None)
 
         user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+        
+        if password:
+            user.set_password(password)  # This is the correct method for setting the password
+            
         user.save(using=self._db)
         return user
 
@@ -24,36 +29,80 @@ class CustomUserManager(BaseUserManager):
 
 
 
-class Customer(AbstractBaseUser):
-    
+
+
+class Baseuser(models.Model):
     email = models.EmailField(unique=True)
+    password = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=timezone.now)
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'email'  # Field used as the unique identifier
+    REQUIRED_FIELDS = []  # Other required fields besides `email`
+
+    class Meta:
+        verbose_name = "Base User"
+        verbose_name_plural = "Base Users"
+
+    def __str__(self):
+        return self.email
+
+    def check_password(self, raw_password):
+        """Check hashed password against a raw password."""
+        from django.contrib.auth.hashers import check_password
+        return check_password(raw_password, self.password)
+
+    def set_password(self, raw_password):
+        """Set and hash the password."""
+        self.password = make_password(raw_password)
+        self.save()
+        
+    def has_perm(self, perm, obj=None):
+        """Return True if the user has the specific permission, False otherwise."""
+        # Add logic here to check for specific permissions
+        return True  # Placeholder, modify based on your needs
+
+    def has_module_perms(self, app_label):
+        """Return True if the user has permissions for the given app label."""
+        # Add logic here to check for module permissions
+        return True  # Placeholder, modify based on your needs
+
+    @property
+    def is_authenticated(self):
+        """Property to mimic `is_authenticated` for custom user models."""
+        return True
+    
+    @property
+    def is_anonymous(self):
+        """Always return False for authenticated users."""
+        return False
+
+
+# Customer Model
+class Customers(Baseuser):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    is_active = models.BooleanField(default=True)
-    is_customer = models.BooleanField(default=True)
-    date_joined = models.DateTimeField(default=timezone.now)
 
-    objects = CustomUserManager()
-
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
+    class Meta:
+        verbose_name = "Customer"
+        verbose_name_plural = "Customers"
 
     def __str__(self):
-        return self.email
+        return f"{self.first_name} {self.last_name}"
 
 
-class Vendor(AbstractBaseUser):
-    email = models.EmailField(unique=True)
+# Vendor Model
+class Vendors(Baseuser):
     business_name = models.CharField(max_length=255)
     contact_number = models.CharField(max_length=15)
-    is_active = models.BooleanField(default=True)
-    is_vendor = models.BooleanField(default=True)
-    date_joined = models.DateTimeField(default=timezone.now)
 
-    objects = CustomUserManager()
-
-    USERNAME_FIELD = 'email'
- 
+    class Meta:
+        verbose_name = "Vendor"
+        verbose_name_plural = "Vendors"
 
     def __str__(self):
-        return self.email
+        return self.business_name

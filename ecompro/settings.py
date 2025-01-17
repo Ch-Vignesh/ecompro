@@ -42,12 +42,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'accounts',
     'ecomapp',
-    'rest_framework.authtoken',
+    # 'rest_framework.authtoken',
     # 'django.contrib.sites', 
     'rest_framework_simplejwt',
     'cart',
     'orders',
-    'payments',
+    #'payments',
     ]
 
 REST_FRAMEWORK = {
@@ -133,9 +133,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-]
+# AUTHENTICATION_BACKENDS = [
+#     'django.contrib.auth.backends.ModelBackend',
+# ]
 
 
 # Internationalization
@@ -161,3 +161,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # SITE_ID = 2
+
+AUTH_USER_MODEL = 'accounts.BaseUser'
